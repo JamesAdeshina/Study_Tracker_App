@@ -1,24 +1,22 @@
 import sqlite3
 import logging
-from time import time
 
-# Setup logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
-
 DATABASE = "study_tracker.db"
 
 def create_connection():
-    """Establish a SQLite database connection."""
     try:
-        conn = sqlite3.connect(DATABASE)
-        logging.info("Connected to the SQLite database.")
-        return conn
+        return sqlite3.connect(DATABASE)
     except sqlite3.Error as e:
-        logging.error(f"Connection error: {e}")
+        logging.error(f"Connection failed: {e}")
         return None
 
-def create_courses_table(cursor):
-    """Create the courses table."""
+def create_tables():
+    conn = create_connection()
+    if not conn:
+        return
+    cursor = conn.cursor()
+
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS courses (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -29,8 +27,6 @@ def create_courses_table(cursor):
         );
     """)
 
-def create_timesheets_table(cursor):
-    """Create the timesheets table."""
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS timesheets (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -43,8 +39,6 @@ def create_timesheets_table(cursor):
         );
     """)
 
-def create_milestones_table(cursor):
-    """Create the milestones table."""
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS milestones (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -55,27 +49,33 @@ def create_milestones_table(cursor):
         );
     """)
 
-def create_tables():
-    """Create all required tables."""
-    start = time()
+    conn.commit()
+    conn.close()
+    logging.info("Tables created successfully.")
+
+def get_courses():
     conn = create_connection()
-    if not conn:
-        return
     cursor = conn.cursor()
+    cursor.execute("SELECT id, name FROM courses")
+    courses = cursor.fetchall()
+    conn.close()
+    return courses
 
-    try:
-        create_courses_table(cursor)
-        create_timesheets_table(cursor)
-        create_milestones_table(cursor)
+def add_course(name, start_date, duration_weeks, exam_date):
+    conn = create_connection()
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO courses (name, start_date, duration_weeks, exam_date) VALUES (?, ?, ?, ?)",
+                   (name, start_date, duration_weeks, exam_date))
+    conn.commit()
+    conn.close()
+    logging.info(f"Course added: {name}")
 
-        conn.commit()
-        logging.info("All tables created successfully.")
-    except sqlite3.Error as e:
-        logging.error(f"Error during table creation: {e}")
-    finally:
-        conn.close()
-        logging.info(f"Table creation completed in {time() - start:.2f} seconds.")
-
-# Run when this file is executed directly
-if __name__ == "__main__":
-    create_tables()
+def delete_course(course_id):
+    conn = create_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM timesheets WHERE course_id = ?", (course_id,))
+    cursor.execute("DELETE FROM milestones WHERE course_id = ?", (course_id,))
+    cursor.execute("DELETE FROM courses WHERE id = ?", (course_id,))
+    conn.commit()
+    conn.close()
+    logging.info(f"Course deleted: {course_id}")
