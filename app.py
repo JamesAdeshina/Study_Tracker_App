@@ -1,123 +1,82 @@
 import streamlit as st
 from datetime import datetime
-from db import create_connection, create_tables
-import sqlite3
-import logging
-from time import time
-
-# Set up logging
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
-
-# Create tables on app startup
-create_tables()
+from db import create_tables, get_courses, add_course, delete_course
+from course_utils import (
+    log_timesheet, get_timesheets,
+    add_milestone, get_milestones,
+    update_milestone_status
+)
 
 st.set_page_config(page_title="Study Tracker", layout="centered")
 st.title("📘 Study Tracker App")
 
-# --- Utility Functions ---
+# Ensure database is ready
+create_tables()
 
-def get_courses():
-    """Fetch all courses."""
-    conn = create_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT id, name FROM courses")
-    courses = cursor.fetchall()
-    conn.close()
-    return courses
-
-def add_course(name, start_date, duration_weeks, exam_date):
-    """Insert a new course into the database."""
-    conn = create_connection()
-    cursor = conn.cursor()
-    cursor.execute("""
-        INSERT INTO courses (name, start_date, duration_weeks, exam_date)
-        VALUES (?, ?, ?, ?)
-    """, (name, start_date, duration_weeks, exam_date))
-    conn.commit()
-    conn.close()
-    logging.info(f"Course added: {name}")
-
-def log_timesheet(course_id, week_start, hours, topics_covered, completed):
-    """Log a weekly study entry."""
-    conn = create_connection()
-    cursor = conn.cursor()
-    cursor.execute("""
-        INSERT INTO timesheets (course_id, week_start, hours, topics_covered, completed)
-        VALUES (?, ?, ?, ?, ?)
-    """, (course_id, week_start, hours, topics_covered, completed))
-    conn.commit()
-    conn.close()
-    logging.info(f"Timesheet logged for course_id: {course_id}")
-
-def get_timesheets(course_id):
-    """Fetch all timesheets for a course."""
-    conn = create_connection()
-    cursor = conn.cursor()
-    cursor.execute("""
-        SELECT week_start, hours, topics_covered, completed
-        FROM timesheets
-        WHERE course_id = ?
-        ORDER BY week_start
-    """, (course_id,))
-    rows = cursor.fetchall()
-    conn.close()
-    return rows
-
-def add_milestone(course_id, text):
-    """Add a new milestone for a course."""
-    conn = create_connection()
-    cursor = conn.cursor()
-    cursor.execute("INSERT INTO milestones (course_id, milestone_text, status) VALUES (?, ?, ?)",
-                   (course_id, text, "pending"))
-    conn.commit()
-    conn.close()
-    logging.info(f"Milestone added: {text}")
-
-def get_milestones(course_id):
-    """Fetch all milestones for a course."""
-    conn = create_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT id, milestone_text, status FROM milestones WHERE course_id = ?", (course_id,))
-    rows = cursor.fetchall()
-    conn.close()
-    return rows
-
-def update_milestone_status(milestone_id, status):
-    """Update the status of a milestone."""
-    conn = create_connection()
-    cursor = conn.cursor()
-    cursor.execute("UPDATE milestones SET status = ? WHERE id = ?", (status, milestone_id))
-    conn.commit()
-    conn.close()
-    logging.info(f"Milestone {milestone_id} updated to {status}")
-
-# --- UI: Course Creation ---
-st.header("🎓 Create a New Course")
-course_name = st.text_input("Course Name")
-start_date = st.date_input("Start Date", datetime.today())
-duration_weeks = st.number_input("Duration (weeks)", min_value=1)
-exam_date = st.date_input("Exam Date")
-
-if st.button("Add Course"):
-    if course_name:
-        start = time()
-        add_course(course_name, str(start_date), duration_weeks, str(exam_date))
-        st.success(f"✅ Course '{course_name}' added!")
-        st.toast("Course created.")
-        logging.info(f"Course creation took {time() - start:.2f} seconds.")
-    else:
-        st.warning("Course name is required.")
-
-# --- UI: Select Course ---
-st.header("📂 Select a Course")
+# --- First-Time User Experience ---
 courses = get_courses()
-if courses:
-    selected = st.selectbox("Choose a course", courses, format_func=lambda x: x[1])
-    selected_course_id = selected[0]
-    selected_course_name = selected[1]
 
-    # --- UI: Timesheet Logging ---
-    st.subheader(f"📝 Log Weekly Study for: {selected_course_name}")
+if not courses:
+    st.image("https://cdn-icons-png.flaticon.com/512/3135/3135768.png", width=100)
+    st.markdown("### 👋 Welcome to Study Tracker")
+    st.markdown("Let's get started by adding your first course.")
+
+    with st.form("first_course_form"):
+        name = st.text_input("Course Name")
+        start = st.date_input("Start Date", datetime.today())
+        weeks = st.number_input("Duration (weeks)", min_value=1)
+        exam = st.date_input("Exam Date")
+        submitted = st.form_submit_button("Add Course")
+        if submitted and name:
+            add_course(name, str(start), weeks, str(exam))
+            st.success("Course added! Refresh to begin.")
+            st.experimental_rerun()
+    st.stop()
+
+# --- Course Dashboard ---
+st.header("📚 Your Courses")
+
+for course_id, course_name in courses:
+    col1, col2, col3 = st.columns([6, 1, 1])
+    with col1:
+        st.markdown(f"#### {course_name}")
+    with col2:
+        if st.button("✏️", key=f"edit_{course_id}"):
+            st.warning("Edit feature coming soon.")
+    with col3:
+        if st.button("🗑️", key=f"delete_{course_id}"):
+            delete_course(course_id)
+            st.experimental_rerun()
+
+    if st.button("Select", key=f"select_{course_id}"):
+        st.session_state.selected_course_id = course_id
+        st.session_state.selected_course_name = course_name
+        st.experimental_rerun()
+
+if st.button("➕ Add Another Course"):
+    st.session_state["show_add_form"] = True
+
+# --- Inline Add Course ---
+if st.session_state.get("show_add_form"):
+    st.markdown("### ➕ Add New Course")
+    name = st.text_input("New Course Name", key="new_course_name")
+    start = st.date_input("New Start Date", datetime.today(), key="new_start")
+    weeks = st.number_input("New Duration (weeks)", min_value=1, key="new_duration")
+    exam = st.date_input("New Exam Date", key="new_exam")
+    if st.button("Create Course"):
+        if name:
+            add_course(name, str(start), weeks, str(exam))
+            st.success("Course added!")
+            st.session_state["show_add_form"] = False
+            st.experimental_rerun()
+
+# --- Course Tracker ---
+if "selected_course_id" in st.session_state:
+    cid = st.session_state.selected_course_id
+    cname = st.session_state.selected_course_name
+
+    st.markdown(f"## 🧾 Weekly Tracker for: **{cname}**")
+
     week_start = st.date_input("Week Starting", datetime.today())
     hours = st.number_input("Study Hours", min_value=0.5, step=0.5)
     topics = st.text_area("Topics Covered")
@@ -125,38 +84,25 @@ if courses:
 
     if st.button("Save Timesheet"):
         if topics:
-            log_timesheet(selected_course_id, str(week_start), hours, topics, int(completed))
-            st.success("✅ Timesheet saved.")
+            log_timesheet(cid, str(week_start), hours, topics, int(completed))
+            st.success("Timesheet saved.")
         else:
-            st.warning("Please describe the topics covered.")
+            st.warning("Please add some topic details.")
 
-    # --- UI: Timesheet Table ---
-    st.subheader(f"📊 Timesheet for {selected_course_name}")
-    rows = get_timesheets(selected_course_id)
+    rows = get_timesheets(cid)
     if rows:
-        total_hours = sum(row[1] for row in rows)
-        st.markdown(f"**Total Weeks Logged:** {len(rows)}")
-        st.markdown(f"**Total Hours Studied:** {total_hours:.1f}")
-        st.table([{
-            "Week Start": row[0],
-            "Hours": row[1],
-            "Topics": row[2],
-            "Completed": "✅" if row[3] else "❌"
-        } for row in rows])
-    else:
-        st.info("No timesheet entries yet.")
+        st.write(f"**Total Logged Weeks:** {len(rows)} | **Total Hours:** {sum(r[1] for r in rows):.1f}")
+        st.table([{ "Week": r[0], "Hours": r[1], "Topics": r[2], "Completed": "✅" if r[3] else "❌" } for r in rows])
 
-    # --- UI: Milestones ---
-    st.subheader(f"🎯 Milestones for {selected_course_name}")
-    new_milestone = st.text_input("Add a New Milestone")
-    if st.button("Add Milestone"):
-        if new_milestone:
-            add_milestone(selected_course_id, new_milestone)
-            st.success("Milestone added.")
-        else:
-            st.warning("Please enter a milestone.")
+    # --- Milestones ---
+    st.markdown("### 🎯 Milestones")
+    new_ms = st.text_input("Add Milestone")
+    if st.button("Save Milestone") and new_ms:
+        add_milestone(cid, new_ms)
+        st.success("Milestone added.")
+        st.experimental_rerun()
 
-    milestones = get_milestones(selected_course_id)
+    milestones = get_milestones(cid)
     if milestones:
         for mid, text, status in milestones:
             col1, col2 = st.columns([6, 1])
@@ -169,7 +115,3 @@ if courses:
                         st.experimental_rerun()
                 else:
                     st.markdown("✅")
-    else:
-        st.info("No milestones yet.")
-else:
-    st.warning("No courses found. Please create one first.")
