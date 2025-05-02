@@ -1,7 +1,7 @@
 import streamlit as st
 from datetime import datetime
 from db import create_tables, get_courses, add_course, delete_course
-from course_utils import (
+from utils.course_utils import (
     log_timesheet, get_timesheets,
     add_milestone, get_milestones,
     update_milestone_status
