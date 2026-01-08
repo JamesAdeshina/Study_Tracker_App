@@ -8,7 +8,7 @@ from utils.course_utils import (
 )
 
 st.set_page_config(page_title="Study Tracker", layout="centered")
-st.title("📘 Study Tracker App")
+st.title("Study Tracker App")
 
 # Ensure database is ready
 create_tables()
@@ -18,7 +18,7 @@ courses = get_courses()
 
 if not courses:
     st.image("https://cdn-icons-png.flaticon.com/512/3135/3135768.png", width=100)
-    st.markdown("### 👋 Welcome to Study Tracker")
+    st.markdown("###  Welcome to Study Tracker")
     st.markdown("Let's get started by adding your first course.")
 
     with st.form("first_course_form"):
