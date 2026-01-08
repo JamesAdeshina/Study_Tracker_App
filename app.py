@@ -34,17 +34,17 @@ if not courses:
     st.stop()
 
 # --- Course Dashboard ---
-st.header("📚 Your Courses")
+st.header(" Your Courses")
 
 for course_id, course_name in courses:
     col1, col2, col3 = st.columns([6, 1, 1])
     with col1:
         st.markdown(f"#### {course_name}")
     with col2:
-        if st.button("✏️", key=f"edit_{course_id}"):
+        if st.button("", key=f"edit_{course_id}"):
             st.warning("Edit feature coming soon.")
     with col3:
-        if st.button("🗑️", key=f"delete_{course_id}"):
+        if st.button("", key=f"delete_{course_id}"):
             delete_course(course_id)
             st.experimental_rerun()
 
@@ -53,12 +53,12 @@ for course_id, course_name in courses:
         st.session_state.selected_course_name = course_name
         st.experimental_rerun()
 
-if st.button("➕ Add Another Course"):
+if st.button(" Add Another Course"):
     st.session_state["show_add_form"] = True
 
 # --- Inline Add Course ---
 if st.session_state.get("show_add_form"):
-    st.markdown("### ➕ Add New Course")
+    st.markdown("###  Add New Course")
     name = st.text_input("New Course Name", key="new_course_name")
     start = st.date_input("New Start Date", datetime.today(), key="new_start")
     weeks = st.number_input("New Duration (weeks)", min_value=1, key="new_duration")
@@ -75,7 +75,7 @@ if "selected_course_id" in st.session_state:
     cid = st.session_state.selected_course_id
     cname = st.session_state.selected_course_name
 
-    st.markdown(f"## 🧾 Weekly Tracker for: **{cname}**")
+    st.markdown(f"##  Weekly Tracker for: **{cname}**")
 
     week_start = st.date_input("Week Starting", datetime.today())
     hours = st.number_input("Study Hours", min_value=0.5, step=0.5)
@@ -95,7 +95,7 @@ if "selected_course_id" in st.session_state:
         st.table([{ "Week": r[0], "Hours": r[1], "Topics": r[2], "Completed": "✅" if r[3] else "❌" } for r in rows])
 
     # --- Milestones ---
-    st.markdown("### 🎯 Milestones")
+    st.markdown("###  Milestones")
     new_ms = st.text_input("Add Milestone")
     if st.button("Save Milestone") and new_ms:
         add_milestone(cid, new_ms)
